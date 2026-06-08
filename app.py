@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from utils import process_core_data
-from charts import generate_executive_summary
+from charts import generate_executive_summary, generate_hourly_transactions_chart
 
 # ==========================================
 # 1. KONFIGURASI NAVIGASI HALAMAN (SIDEBAR)
@@ -63,7 +63,6 @@ if halaman == "Konsolidasi Data":
         else:
             if st.button("🚀 Mulai Konsolidasi Data", type="primary", use_container_width=True):
                 with st.spinner('Sedang mengolah data...'):
-                    # Pemanggilan core logic dari utils.py
                     df_final = process_core_data(uploaded_files, use_filter, start_date, end_date, use_pump_test_filter)
                     
                     if not df_final.empty:
@@ -126,9 +125,10 @@ elif halaman == "Executive Dashboard":
     row3_col1, row3_col2 = st.columns(2)
     with row3_col1:
         st.markdown("### 🎨 Pilih Jenis Analisis & Grafik")
+        # AKSI: Menambahkan opsi pilihan baru di dalam dropdown menu
         jenis_analisis = st.selectbox(
             "Pilih visualisasi data yang ingin ditampilkan:",
-            ["Executive Summary"] 
+            ["Executive Summary", "Rata-Rata Transaksi per Jam"] 
         )
     with row3_col2:
         st.markdown("### 🖼️ Format Gambar Unduhan")
@@ -152,22 +152,25 @@ elif halaman == "Executive Dashboard":
 
     if not df_dashboard.empty:
         if st.button("📊 Generate Visualisasi Data", type="primary", use_container_width=True):
-            with st.spinner('Sedang menghitung metrik eksekutif...'):
+            with st.spinner('Sedang memproses visualisasi grafik...'):
                 
-                # Pemanggilan fungsi visualisasi dari charts.py
+                # Eksekusi Percabangan Sesuai Pilihan Dropdown Pengguna
                 if jenis_analisis == "Executive Summary":
                     fig, buf = generate_executive_summary(df_dashboard, format_gambar)
+                elif jenis_analisis == "Rata-Rata Transaksi per Jam":
+                    fig, buf = generate_hourly_transactions_chart(df_dashboard, format_gambar)
                     
-                    st.pyplot(fig)
-                    
-                    st.markdown("### 📥 Sesi Unduh Gambar Laporan:")
-                    st.download_button(
-                        label=f"📥 Download Dashboard Ringkasan ({format_gambar})",
-                        data=buf.getvalue(),
-                        file_name=f"{nama_output}.{format_gambar.lower()}",
-                        mime=f"image/{format_gambar.lower()}",
-                        type="primary",
-                        use_container_width=True
-                    )
+                # Tampilkan gambar di web & sediakan tombol unduh universal
+                st.pyplot(fig)
+                
+                st.markdown("### 📥 Sesi Unduh Gambar Laporan:")
+                st.download_button(
+                    label=f"📥 Download Grafik ({format_gambar})",
+                    data=buf.getvalue(),
+                    file_name=f"{nama_output}.{format_gambar.lower()}",
+                    mime=f"image/{format_gambar.lower()}",
+                    type="primary",
+                    use_container_width=True
+                )
     else:
         st.info("💡 Petunjuk: Silakan unggah file mentah Excel (.xlsx) pada Fitur 1 atau lakukan konsolidasi data terlebih dahulu di Halaman 1.")
