@@ -116,7 +116,6 @@ def generate_executive_summary(df_dashboard, format_gambar):
 def generate_hourly_transactions_chart(df_dashboard, format_gambar):
     font_regular, font_bold = get_fonts()
     
-    # 1. Hitung jumlah hari kalender bisnis murni
     if 'Time' in df_dashboard.columns:
         dt_combined = pd.to_datetime(df_dashboard['Date'].astype(str) + ' ' + df_dashboard['Time'].astype(str), errors='coerce')
         business_dates = dt_combined - pd.Timedelta(hours=6)
@@ -128,72 +127,197 @@ def generate_hourly_transactions_chart(df_dashboard, format_gambar):
     num_days = len(unique_b_dates)
     num_days = 1 if num_days == 0 else num_days
     
-    # 2. Ekstrak jam fisik
     df_dashboard['Physical_Hour'] = dt_combined.dt.hour
-    
-    # 3. Grouping hitung total ID transaksi per jam
     hourly_counts = df_dashboard.groupby('Physical_Hour')['ID'].count().reindex(range(24), fill_value=0)
-    
-    # 4. Hitung rata-rata jumlah transaksi per jam
     hourly_avg = hourly_counts / num_days
     
-    # --- PROSES MENGGAMBAR GRAFIK LINE (RASIO 16:8) ---
     fig, ax = plt.subplots(figsize=(16, 8), facecolor='#0e1117')
     ax.set_facecolor('#1e222b')
     
-    # Menggambar Garis Tren Utama
     ax.plot(range(24), hourly_avg.values, marker='o', color='#3b82f6', linewidth=3, markersize=8, label='Rata-rata Transaksi')
     ax.fill_between(range(24), hourly_avg.values, color='#3b82f6', alpha=0.15)
     
-    # PENYESUAIAN 2: Menghapus total judul paling atas agar tampilan lebih clean
-    # ax.set_title(...) dihapus total
-    
-    # Konfigurasi Sumbu Grafik
-    ax.set_xlabel("Waktu Operasional (Jam)", color='#9ca3af', fontsize=12, fontproperties=font_regular, labelpad=12)
-    
-    # PENYESUAIAN 1: Menghilangkan akhiran "(ID)" pada label sumbu Y
+    ax.set_xlabel("Waktu Operasional (Jam)", color='#ffffff', fontsize=12, fontproperties=font_regular, labelpad=12) 
     ax.set_ylabel("Rata-Rata Jumlah Transaksi", color='#9ca3af', fontsize=12, fontproperties=font_regular, labelpad=12)
     
-    # Kustomisasi Sumbu X (00:00 s.d 23:00)
     ax.set_xticks(range(24))
     ax.set_xticklabels([f"{h:02d}:00" for h in range(24)], rotation=0, color='#9ca3af', fontproperties=font_regular, fontsize=10)
     
-    # PENYESUAIAN 3: Menambahkan Data Label berbentuk bulat tanpa desimal di setiap titik jam
-    # Menghitung offset dinamis di atas titik agar teks tidak menempel pas di bulatan marker
     y_max = max(hourly_avg.values) if max(hourly_avg.values) > 0 else 1
     label_offset = y_max * 0.02
     
     for x, y in zip(range(24), hourly_avg.values):
-        ax.text(
-            x, 
-            y + label_offset, 
-            f"{y:.0f}", # Format tanpa desimal (.0f)
-            color='#ffffff', 
-            fontsize=10, 
-            fontproperties=font_bold,
-            ha='center', 
-            va='bottom'
-        )
+        ax.text(x, y + label_offset, f"{y:.0f}", color='#ffffff', fontsize=10, fontproperties=font_bold, ha='center', va='bottom')
     
-    # Mengatur batas atas sumbu Y sedikit lebih tinggi agar data label teratas tidak terpotong garis tepi
     ax.set_ylim(bottom=0, top=y_max + (label_offset * 4))
-    
-    # Pengaturan font dan warna penanda angka sumbu Y
     ax.tick_params(colors='#9ca3af', labelsize=10)
     for label in ax.get_yticklabels():
         label.set_fontproperties(font_regular)
         
-    # Set warna border card grafik
     for spine in ax.spines.values():
         spine.set_color('#2d323f')
         spine.set_linewidth(1.5)
         
-    # Berikan garis kisi-kisi (Grid) yang tipis dan elegan
     ax.grid(True, linestyle='--', alpha=0.1, color='#ffffff')
     
-    # --- SIMPAN KE MEMORY SEBAGAI BYTE (SIAP UNDUH) ---
     buf = io.BytesIO()
     fmt = "jpeg" if format_gambar.lower() == "jpg" else format_gambar.lower()
     fig.savefig(buf, format=fmt, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight', dpi=150)
+    return fig, buf
+
+# ==========================================
+# GENERATOR GAMBAR: RATA-RATA TRANSAKSI PER HARI
+# ==========================================
+def generate_daily_transactions_chart(df_dashboard, format_gambar):
+    font_regular, font_bold = get_fonts()
     
+    if 'Time' in df_dashboard.columns:
+        dt_combined = pd.to_datetime(df_dashboard['Date'].astype(str) + ' ' + df_dashboard['Time'].astype(str), errors='coerce')
+        business_combined = dt_combined - pd.Timedelta(hours=6)
+    else:
+        dt_combined = pd.to_datetime(df_dashboard['Date'], errors='coerce')
+        business_combined = dt_combined
+        
+    unique_b_dates = pd.Series(business_combined.dt.date.dropna().unique())
+    unique_days_of_week = pd.to_datetime(unique_b_dates).dt.dayofweek
+    days_occurrence = unique_days_of_week.value_counts().reindex(range(7), fill_value=1)
+    days_occurrence = days_occurrence.replace(0, 1) 
+    
+    df_dashboard['Business_DayofWeek'] = business_combined.dt.dayofweek
+    daily_counts = df_dashboard.groupby('Business_DayofWeek')['ID'].count().reindex(range(7), fill_value=0)
+    daily_avg = daily_counts / days_occurrence
+    
+    fig, ax = plt.subplots(figsize=(16, 8), facecolor='#0e1117')
+    ax.set_facecolor('#1e222b')
+    
+    ax.plot(range(7), daily_avg.values, marker='o', color='#f59e0b', linewidth=3, markersize=10, label='Rata-rata Harian')
+    ax.fill_between(range(7), daily_avg.values, color='#f59e0b', alpha=0.12)
+    
+    ax.set_xlabel("Hari Operasional", color='#ffffff', fontsize=12, fontproperties=font_regular, labelpad=12) 
+    ax.set_ylabel("Rata-Rata Jumlah Transaksi", color='#9ca3af', fontsize=12, fontproperties=font_regular, labelpad=12)
+    
+    nama_hari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+    ax.set_xticks(range(7))
+    ax.set_xticklabels(nama_hari, color='#9ca3af', fontproperties=font_regular, fontsize=11)
+    
+    y_max = max(daily_avg.values) if max(daily_avg.values) > 0 else 1
+    label_offset = y_max * 0.02
+    
+    for x, y in zip(range(7), daily_avg.values):
+        ax.text(x, y + label_offset, f"{y:.0f}", color='#ffffff', fontsize=11, fontproperties=font_bold, ha='center', va='bottom')
+        
+    ax.set_ylim(bottom=0, top=y_max + (label_offset * 4))
+    ax.tick_params(colors='#9ca3af', labelsize=10)
+    for label in ax.get_yticklabels():
+        label.set_fontproperties(font_regular)
+        
+    for spine in ax.spines.values():
+        spine.set_color('#2d323f')
+        spine.set_linewidth(1.5)
+        
+    ax.grid(True, linestyle='--', alpha=0.1, color='#ffffff')
+    
+    buf = io.BytesIO()
+    fmt = "jpeg" if format_gambar.lower() == "jpg" else format_gambar.lower()
+    fig.savefig(buf, format=fmt, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight', dpi=150)
+    return fig, buf
+
+# ==========================================
+# GENERATOR GAMBAR: SALES MOVEMENT BY MONTH (DUAL AXIS)
+# ==========================================
+def generate_monthly_movement_chart(df_dashboard, format_gambar):
+    font_regular, font_bold = get_fonts()
+    
+    if 'Time' in df_dashboard.columns:
+        dt_combined = pd.to_datetime(df_dashboard['Date'].astype(str) + ' ' + df_dashboard['Time'].astype(str), errors='coerce')
+        business_combined = dt_combined - pd.Timedelta(hours=6)
+    else:
+        business_combined = pd.to_datetime(df_dashboard['Date'], errors='coerce')
+    
+    df_dashboard['B_Date'] = business_combined.dt.date
+    df_dashboard['B_Month'] = business_combined.dt.to_period('M')
+    
+    list_months = sorted(df_dashboard['B_Month'].unique())
+    
+    monthly_data = []
+    for month in list_months:
+        temp_df = df_dashboard[df_dashboard['B_Month'] == month]
+        
+        unique_days = temp_df['B_Date'].nunique()
+        unique_days = 1 if unique_days == 0 else unique_days
+        
+        avg_val_day = temp_df['Value (Rp.)'].sum() / unique_days
+        avg_vol_day = temp_df['Volume (L)'].sum() / unique_days
+        
+        monthly_data.append({
+            'Month_Label': month.strftime('%b %Y'),
+            'Avg_Value': avg_val_day,
+            'Avg_Volume': avg_vol_day
+        })
+    
+    res_df = pd.DataFrame(monthly_data)
+    
+    fig, ax1 = plt.subplots(figsize=(16, 8), facecolor='#0e1117')
+    ax1.set_facecolor('#1e222b')
+    
+    # AXIS 1: BAR untuk Sales Value (Rupiah) - Kiri
+    color_val = '#8b5cf6' 
+    bars = ax1.bar(res_df['Month_Label'], res_df['Avg_Value'] / 1_000_000, 
+                   color=color_val, alpha=0.8, width=0.6, label='Avg Daily Sales (Juta Rp)')
+    
+    # AXIS 2: LINE untuk Sales Volume (Liter) - Kanan
+    ax2 = ax1.twinx()
+    color_vol = '#f97316' 
+    line = ax2.plot(res_df['Month_Label'], res_df['Avg_Volume'], 
+                    color=color_vol, marker='o', linewidth=4, markersize=12, 
+                    label='Avg Daily Volume (L)')
+    
+    # KONTRAK UTAMA JUDUL SUMBU X (Putih)
+    ax1.set_xlabel("Bulan Operasional", color='#ffffff', fontsize=12, fontproperties=font_regular, labelpad=15)
+    
+    # FIX TOTAL: Memaksa label teks nama bulan di sumbu X berwarna PUTIH CERNA
+    ax1.tick_params(axis='x', colors='#ffffff', labelsize=11)
+    
+    ax1.set_ylabel("Rata-Rata Penjualan (Juta Rp)", color=color_val, fontsize=12, fontproperties=font_bold, labelpad=15)
+    ax1.tick_params(axis='y', labelcolor='#9ca3af', labelsize=11)
+    
+    ax2.set_ylabel("Rata-Rata Volume (Liter)", color=color_vol, fontsize=12, fontproperties=font_bold, labelpad=15)
+    ax2.tick_params(axis='y', labelcolor='#9ca3af', labelsize=11)
+    
+    # Integrasi Properti Font & Warna pada Sumbu
+    for tick in ax1.get_yticklabels(): tick.set_fontproperties(font_regular)
+    for tick in ax2.get_yticklabels(): tick.set_fontproperties(font_regular)
+    for tick in ax1.get_xticklabels(): 
+        tick.set_fontproperties(font_regular)
+        tick.set_color('#ffffff') # Double-lock warna putih di sumbu X
+    
+    # DATA LABEL: Rupiah (Di atas Bar)
+    for bar in bars:
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height + (height * 0.02),
+                 f"{height:,.1f} Jt", ha='center', va='bottom', color='#ffffff', 
+                 fontproperties=font_bold, fontsize=11)
+                 
+    # DATA LABEL: Volume (Di bawah titik garis)
+    vol_max = max(res_df['Avg_Volume']) if max(res_df['Avg_Volume']) > 0 else 1
+    for i, txt in enumerate(res_df['Avg_Volume']):
+        ax2.text(i, txt - (vol_max * 0.04), 
+                 f"{txt:,.0f} L", ha='center', va='top', color='#ffffff', 
+                 fontproperties=font_bold, fontsize=11, 
+                 bbox=dict(facecolor=color_vol, alpha=0.8, edgecolor='none', boxstyle='round,pad=0.4'))
+
+    # Padding batas sumbu Y
+    vol_min = min(res_df['Avg_Volume'])
+    ax2.set_ylim(bottom=vol_min - (vol_max * 0.1), top=vol_max + (vol_max * 0.1))
+
+    for ax in [ax1, ax2]:
+        for spine in ax.spines.values():
+            spine.set_color('#2d323f')
+            spine.set_linewidth(1.5)
+            
+    ax1.grid(True, axis='y', linestyle='--', alpha=0.1, color='#ffffff')
+    
+    buf = io.BytesIO()
+    fmt = "jpeg" if format_gambar.lower() == "jpg" else format_gambar.lower()
+    fig.savefig(buf, format=fmt, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight', dpi=150)
     return fig, buf
