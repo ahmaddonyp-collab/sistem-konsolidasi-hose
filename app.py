@@ -1,7 +1,12 @@
 import streamlit as st
 import pandas as pd
 from utils import process_core_data
-from charts import generate_executive_summary, generate_hourly_transactions_chart
+from charts import (
+    generate_executive_summary, 
+    generate_hourly_transactions_chart, 
+    generate_daily_transactions_chart,
+    generate_monthly_movement_chart
+)
 
 # ==========================================
 # 1. KONFIGURASI NAVIGASI HALAMAN (SIDEBAR)
@@ -125,10 +130,14 @@ elif halaman == "Executive Dashboard":
     row3_col1, row3_col2 = st.columns(2)
     with row3_col1:
         st.markdown("### 🎨 Pilih Jenis Analisis & Grafik")
-        # AKSI: Menambahkan opsi pilihan baru di dalam dropdown menu
         jenis_analisis = st.selectbox(
             "Pilih visualisasi data yang ingin ditampilkan:",
-            ["Executive Summary", "Rata-Rata Transaksi per Jam"] 
+            [
+                "Executive Summary", 
+                "Rata-Rata Transaksi per Jam", 
+                "Rata-Rata Transaksi per Hari",
+                "Monthly Sales Movement"
+            ] 
         )
     with row3_col2:
         st.markdown("### 🖼️ Format Gambar Unduhan")
@@ -154,13 +163,15 @@ elif halaman == "Executive Dashboard":
         if st.button("📊 Generate Visualisasi Data", type="primary", use_container_width=True):
             with st.spinner('Sedang memproses visualisasi grafik...'):
                 
-                # Eksekusi Percabangan Sesuai Pilihan Dropdown Pengguna
                 if jenis_analisis == "Executive Summary":
                     fig, buf = generate_executive_summary(df_dashboard, format_gambar)
                 elif jenis_analisis == "Rata-Rata Transaksi per Jam":
                     fig, buf = generate_hourly_transactions_chart(df_dashboard, format_gambar)
+                elif jenis_analisis == "Rata-Rata Transaksi per Hari":
+                    fig, buf = generate_daily_transactions_chart(df_dashboard, format_gambar)
+                elif jenis_analisis == "Monthly Sales Movement":
+                    fig, buf = generate_monthly_movement_chart(df_dashboard, format_gambar)
                     
-                # Tampilkan gambar di web & sediakan tombol unduh universal
                 st.pyplot(fig)
                 
                 st.markdown("### 📥 Sesi Unduh Gambar Laporan:")
